@@ -3,6 +3,7 @@
 "use client"
 import Link from "next/link";
 import { Button } from "@/components/ui/button"
+import { connectWallet } from "./connectWallet";
 
 
 
@@ -14,7 +15,6 @@ const Navbar: React.FC = () => {
       <Link href="/" className="text-white font-bold text-xl">
             EuLend
           </Link>
-
         <div className="flex space-x-4">
             <Button asChild>
             <Link href="/borrow">Borrow</Link>
@@ -22,8 +22,11 @@ const Navbar: React.FC = () => {
             <Button asChild>
             <Link href="/lend">Lend</Link>
             </Button>
-            <Button onClick={ () => {
-                console.log("button clicked")
+            <Button onClick={ async () => {
+                console.log("hi")
+                const state = await connectWallet()
+                console.log(state)
+                console.log("yo")
             }
             }>connect wallet</Button>
          
