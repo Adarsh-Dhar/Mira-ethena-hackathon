@@ -2,16 +2,18 @@
 pragma solidity ^0.8.20;
 
 import {ERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
-import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+
+
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+
 import "./MiraWP.sol";
 import "./MiraLp.sol";
 
-contract Mira is Ownable {
+contract Mira {
     // Waiting Pool Token Contract
     MiraWP public wpToken;
     // Lending Pool Token Contract
-    MiraLp public lpToken;
+    MiraLP public lpToken;
     // USDE Token Contract
     IERC20 public usdeToken;
 
@@ -22,13 +24,13 @@ contract Mira is Ownable {
     struct Borrow {
         address borrowerAddress;
         uint256 borrowAmount;
-        unit256 collateral;
+        uint256 collateral;
     }
 
     struct Lend {
         address lenderAddress;
         uint256 lendedAmount;
-        unit256 lendTime;
+        uint256 lendTime;
     }
 
      mapping(address => Borrow) public borrows;
@@ -53,57 +55,66 @@ contract Mira is Ownable {
         address _usdeTokenAddress
     ) {
         wpToken = MiraWP(_wpTokenAddress);
-        lpToken = MiraLp(_lpTokenAddress);
+        lpToken = MiraLP(_lpTokenAddress);
         usdeToken = IERC20(_usdeTokenAddress);
     }
 
-   function borrow(unit256 amount) external payable {
+   function borrow(uint256 amount) external payable {
     //checks
     require(amount > 0, "cannot borrow less than or equal to 0 eth");
     require(msg.value > 0, "value should be greater than 0");
 
     //toke borrower deposit
-    borrows[msg.sender] = Borrow {
-        borrowerAddress = msg.sender;
-        borrowAmount = amount;
-        collateral = msg.amount;
-    }
+    borrows[msg.sender] = Borrow(
+        msg.sender,
+        amount,
+        msg.value
+    );
     //put the deposit in LP
-    totalLiquidityPoolSUSDe += msg.sender;
+    totalLiquidityPoolSUSDe += msg.value;
 
     //take eth from the WP
     payFromWP(amount);
    }
 
-   function Lend() payable external {
+   function lend() payable external {
     //checks
     require(msg.value > 0, "repay amount should be greater than 0");
 
     //lend
-    lends[msg.sender] = Lend {
-        lenderAddress = msg.sender,
-        lendedAmount = msg.value,
-        lendTime = block.timestamp
-    }
+    lends[msg.sender] = Lend(
+        msg.sender,
+        msg.value,
+        block.timestamp
+    );
     
 
     //provide eth to WP
     totalWaitingPoolETH += msg.value;
 
     //mint WP tokens in exchange of some Eth
-    
+    wpToken.mint();
    }
 
-   function getLPTokensFromWPTokens(uint256 amount) {
+   function getLPTokensFromWPTokens(uint256 amount) external {
     //checks
+    require(amount > 0, "amount should be greater than 0");
+
 
     //get lp tokens from the lp in exchange of some wp tokens
+    uint256 amountToBurn = amount; //this needs to change
+    wpToken.burn(msg.sender,amountToBurn);
+    lpToken.mint(msg.sender,amount);
    }
+   
 
-   function getEthFromWPTokens(uint256 amount) {
+   function getEthFromWPTokens(uint256 amount) external payable {
     //checks
+    require(amount > 0, "amount should be greater than 0");
 
     //get eth from the wp using wp tokens
+    wpToken.burn(msg.sender,amount);
+    payable(msg.sender).transfer(amount);
    }
 
    function Repay(uint256 amount) payable external {
@@ -115,4 +126,6 @@ contract Mira is Ownable {
    function payFromWP(uint256 amount) internal {
     //code
    }
+
+
 }
