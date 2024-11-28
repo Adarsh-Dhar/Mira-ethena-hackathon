@@ -14,7 +14,7 @@ contract DeployMiraLP is Script {
     function run() public {
         // Assume sUSDe token address is needed as a constructor parameter
         // Replace with actual sUSDe token address
-        address sUSDe = address(0x1234567890123456789012345678901234567890);
+        address sUSDe = address(0x1B6877c6Dac4b6De4c5817925DC40E2BfdAFc01b);
 
         // Start broadcasting transactions
         vm.startBroadcast();
