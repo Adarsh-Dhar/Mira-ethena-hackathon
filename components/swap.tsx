@@ -93,6 +93,9 @@ export default function TokenSwapInterface() {
   const [toAmount, setToAmount] = useState('');
   const [isFromTokenModalOpen, setIsFromTokenModalOpen] = useState(false);
   const [isToTokenModalOpen, setIsToTokenModalOpen] = useState(false);
+  console.log("from token", fromToken)
+  console.log("to token", toToken)
+
 
   const handleSwapTokens = () => {
     // Swap tokens
