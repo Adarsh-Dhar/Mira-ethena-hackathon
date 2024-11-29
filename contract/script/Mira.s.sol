@@ -13,9 +13,9 @@ contract MiraScript is Script {
 
     function run() public {
         // Replace these with actual addresses of deployed contracts
-        address wpTokenAddress = address(0x1111111111111111111111111111111111111111);
-        address lpTokenAddress = address(0x2222222222222222222222222222222222222222);
-        address susdeTokenAddress = address(0x1B6877c6Dac4b6De4c5817925DC40E2BfdAFc01b);
+        address wpTokenAddress = address(0x6558800901ecd6242bd76AE054eE602ED5E2E65b);
+        address lpTokenAddress = address(0x0FF543c2E1cf1cD52AEbbF24f84E83dEC335cb72);
+
 
         // Start broadcasting transactions
         vm.startBroadcast();
