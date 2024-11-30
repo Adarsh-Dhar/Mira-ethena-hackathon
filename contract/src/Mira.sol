@@ -8,6 +8,7 @@ import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20
 
 import "./MiraWP.sol";
 import "./MiraLp.sol";
+import "./Oracle.sol";
 
 contract Mira {
      address internal constant USDeContract = 0xf805ce4F96e0EdD6f0b6cd4be22B34b92373d696;
@@ -15,14 +16,15 @@ contract Mira {
     uint32 constant CHAIN_EID_BLE = 52085143;
     uint32 constant CHAIN_EID_SEPOLIA = 11155111;
     // Waiting Pool Token Contract
-    MiraWP public wpToken;
+    MiraWP public wpToken; //1:1 with eth
     // Lending Pool Token Contract
-    MiraLP public lpToken;
+    MiraLP public lpToken; //1:1 with susde
     // USDE Token Contract
     IERC20 public usdeToken;
-
     // SUSDE Token Contract
     IERC20 public susdeToken;
+    //oracle contract
+    OracleMira public oracle;
 
     // State variables
     uint256 public totalWaitingPoolETH;
@@ -55,15 +57,32 @@ contract Mira {
         address indexed depositor, 
         uint256 amount
     );
+    event BorrowIncreased(
+        address indexed borrower,
+        uint256 newBorrowAmount,
+        uint256 additionalCollateral
+    );
+    event BorrowRepaid(
+        address indexed borrower,
+        uint256 repaidAmount,
+        uint256 remainingBorrow
+    );
+     event USDUnstaked(
+        address indexed borrower,
+        uint256 amount
+    );
 
     constructor(
         address _wpTokenAddress, 
-        address _lpTokenAddress
+        address _lpTokenAddress,
+        address _oracleAddress
     ) {
         wpToken = MiraWP(_wpTokenAddress);
         lpToken = MiraLP(_lpTokenAddress);
         usdeToken = IERC20(USDeContract);
         susdeToken = IERC20(SUSDeContract);
+        oracle = OracleMira(_oracleAddress);
+
 
     }
 
@@ -96,28 +115,37 @@ contract Mira {
     }
 
    function borrow(uint256 amount) external payable {
-    //checks
-    require(amount > 0, "cannot borrow less than or equal to 0 eth");
-    require(msg.value > 0, "value should be greater than 0");
+        // Checks
+        require(amount > 0, "cannot borrow less than or equal to 0 eth");
+        require(msg.value > 0, "value should be greater than 0");
 
-    // Transfer USDe from user to contract
+        // Transfer USDe from user to contract
         require(usdeToken.transferFrom(msg.sender, address(this), amount), "USDe transfer failed");
 
         // Stake USDe into sUSDe
         stakeUSDe(amount);
 
-    //toke borrower deposit
-    borrows[msg.sender] = Borrow(
-        msg.sender,
-        amount,
-        msg.value
-    );
-    //put the deposit in LP
-    totalLiquidityPoolSUSDe += msg.value;
+        // Update borrow information
+        Borrow storage userBorrow = borrows[msg.sender];
+        
+        // If user has an existing borrow, add to it
+        userBorrow.borrowAmount += amount;
+        userBorrow.collateral += msg.value;
+        userBorrow.borrowerAddress = msg.sender;
 
-    //take eth from the WP
-    payFromWP(amount);
-   }
+        // Emit event with new borrow details
+        emit BorrowIncreased(msg.sender, userBorrow.borrowAmount, msg.value);
+
+        // Put the deposit in LP
+        totalLiquidityPoolSUSDe += msg.value;
+
+        // Take eth from the WP
+        payFromWP(amount);
+    }
+
+    function getBorrow(address _address) external view returns (uint256) {
+        return borrows[_address].borrowAmount;
+    }
 
    function lend() payable external {
     //checks
@@ -142,11 +170,12 @@ contract Mira {
     //checks
     require(amount > 0, "amount should be greater than 0");
 
-
+    uint256 susde_usd = oracle.getSusdeUsdPrice();
+    uint256 eth_usd = oracle.getEthUsdPrice();
     //get lp tokens from the lp in exchange of some wp tokens
-    uint256 amountToBurn = amount; //this needs to change
-    wpToken.burn(msg.sender,amountToBurn);
-    lpToken.mint(msg.sender,amount);
+    uint256 amountToBurn = amount * eth_usd / susde_usd; //convert susde to eth
+    wpToken.burn(msg.sender,amountToBurn); //eth burn
+    lpToken.mint(msg.sender,amount); //susde mint
    }
    
 
@@ -162,10 +191,43 @@ contract Mira {
    
 
    function Repay(uint256 amount) payable external {
-    //checks
+        // Checks
+        Borrow storage userBorrow = borrows[msg.sender];
+        require(amount > 0, "Repay amount must be greater than 0");
+        require(amount <= userBorrow.borrowAmount, "Repay amount exceeds borrowed amount");
 
-    //repay eth to get the collateral
-   }
+        // Reduce the borrowed amount
+        userBorrow.borrowAmount -= amount;
+
+        // Transfer repaid USDe back to the contract
+        require(usdeToken.transferFrom(msg.sender, address(this), amount), "USDe transfer failed");
+
+        // Unstake the USDe
+        // Request withdrawal from sUSDe contract
+        (bool requestSuccess, ) = SUSDeContract.call(
+            abi.encodeWithSignature("requestWithdraw(uint256,address)", amount, address(this))
+        );
+        require(requestSuccess, "Withdrawal request failed");
+
+        // Check and complete withdrawal after cooldown
+        (bool withdrawSuccess, ) = SUSDeContract.call(
+            abi.encodeWithSignature("withdraw(uint256,address,address)", amount, address(this), msg.sender)
+        );
+        require(withdrawSuccess, "Withdrawal failed");
+
+        // Emit event with unstaking details
+        emit USDUnstaked(msg.sender, amount);
+
+        // Emit event with repayment details
+        emit BorrowRepaid(msg.sender, amount, userBorrow.borrowAmount);
+
+        // If borrow is fully repaid, reset the borrow struct
+        if (userBorrow.borrowAmount == 0) {
+            // Return collateral to the borrower
+            payable(msg.sender).transfer(userBorrow.collateral);
+            delete borrows[msg.sender];
+        }
+    }
 
    function payFromWP(uint256 amount) internal {
     //code
