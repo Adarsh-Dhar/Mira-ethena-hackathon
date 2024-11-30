@@ -1,11 +1,11 @@
 import Image from "next/image";
 // import Navbar from "@/components/navbar";
-import TokenSwap from "@/components/swap"
+import Navbar from "@/components/navbar";
 
 export default function Home() {
   return (
    <div>
-    <TokenSwap />
+    <Navbar />
    </div>
   );
 }

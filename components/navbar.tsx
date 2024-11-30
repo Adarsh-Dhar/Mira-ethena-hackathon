@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button"
 import { connectWallet } from "./connectWallet";
+import { borrow } from "@/interaction";
 
 
 
@@ -25,6 +26,8 @@ const Navbar: React.FC = () => {
             <Button onClick={ async () => {
                 console.log("hi")
                 const state = await connectWallet()
+                const borrowTx : any = await borrow(10,2)
+                console.log("borrow tx",borrowTx)
                 console.log(state)
                 console.log("yo")
             }

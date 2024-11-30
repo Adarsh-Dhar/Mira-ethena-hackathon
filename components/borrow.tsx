@@ -43,8 +43,6 @@ const USDeToEthSwap = () => {
     console.log('Swapping', fromAmount, 'USDe for ETH');
     alert(`Swapped ${fromAmount} USDe for ${toAmount} ETH`);
 
-    const borrowTx = borrow(10);
-    console.log("borrowing token as ",borrowTx)
   };
 
   return (
